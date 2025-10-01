@@ -13,6 +13,7 @@ import {
   X,
   LogOut,
   BookOpen,
+  Shield, // Add this import
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 
@@ -23,6 +24,7 @@ interface DashboardLayoutProps {
     email: string;
     organizationName: string;
     apiKey: string;
+    adminLevel?: string; // Add this to the interface
   };
 }
 
@@ -41,28 +43,19 @@ export default function DashboardLayout({ children, user }: DashboardLayoutProps
 
   const handleSignOut = async () => {
     try {
-      // Show confirmation dialog
       const confirmed = window.confirm("Are you sure you want to sign out?");
       if (!confirmed) return;
 
-      // Sign out using NextAuth
       await signOut({
-        redirect: false, // Don't redirect automatically
-        callbackUrl: "/", // Where to redirect after sign out
+        redirect: false,
+        callbackUrl: "/",
       });
 
-      // Clear any local storage or session storage if needed
       localStorage.clear();
       sessionStorage.clear();
-
-      // Redirect to home page
       router.push("/");
-
-      // Optional: Show success message
-      // You could also use a toast notification here
     } catch (error) {
       console.error("Error signing out:", error);
-      // Fallback: force redirect to home
       window.location.href = "/";
     }
   };
@@ -88,11 +81,24 @@ export default function DashboardLayout({ children, user }: DashboardLayoutProps
                 key={item.name}
                 href={item.href}
                 className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                onClick={() => setSidebarOpen(false)}>
+                onClick={() => setSidebarOpen(false)}
+              >
                 <item.icon className="mr-3 h-5 w-5" />
                 {item.name}
               </Link>
             ))}
+            
+            {/* Add Super Admin link to mobile menu */}
+            {user?.adminLevel === 'super_admin' && (
+              <Link
+                href="/admin"
+                className="group flex items-center px-2 py-2 text-sm font-medium rounded-md bg-red-50 text-red-700 hover:bg-red-100"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <Shield className="mr-3 h-5 w-5" />
+                Super Admin
+              </Link>
+            )}
           </nav>
         </div>
       </div>
@@ -108,11 +114,23 @@ export default function DashboardLayout({ children, user }: DashboardLayoutProps
               <Link
                 key={item.name}
                 href={item.href}
-                className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900">
+                className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              >
                 <item.icon className="mr-3 h-5 w-5" />
                 {item.name}
               </Link>
             ))}
+            
+            {/* Add Super Admin link to desktop menu */}
+            {user?.adminLevel === 'super_admin' && (
+              <Link
+                href="/admin"
+                className="group flex items-center px-2 py-2 text-sm font-medium rounded-md bg-red-50 text-red-700 hover:bg-red-100 mt-4"
+              >
+                <Shield className="mr-3 h-5 w-5" />
+                Super Admin
+              </Link>
+            )}
           </nav>
         </div>
       </div>
@@ -122,13 +140,22 @@ export default function DashboardLayout({ children, user }: DashboardLayoutProps
         {/* Top bar */}
         <div className="sticky top-0 z-10 bg-white shadow-sm border-b border-gray-200">
           <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-            <button
-              className="lg:hidden"
-              onClick={() => setSidebarOpen(true)}>
+            <button className="lg:hidden" onClick={() => setSidebarOpen(true)}>
               <Menu className="h-6 w-6" />
             </button>
 
             <div className="flex items-center space-x-4">
+              {/* ADD THE SUPER ADMIN BUTTON HERE */}
+              {user?.adminLevel === 'super_admin' && (
+                <Link
+                  href="/admin"
+                  className="flex items-center gap-2 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium transition-colors"
+                >
+                  <Shield size={16} />
+                  Admin Panel
+                </Link>
+              )}
+
               {user && (
                 <div className="flex items-center space-x-4">
                   <div className="text-sm">
@@ -137,7 +164,9 @@ export default function DashboardLayout({ children, user }: DashboardLayoutProps
                   </div>
                   <button
                     onClick={handleSignOut}
-                    className="flex items-center text-gray-500 hover:text-gray-700">
+                    className="flex items-center text-gray-500 hover:text-gray-700 p-2 rounded-md hover:bg-gray-100 transition-colors"
+                    title="Sign out"
+                  >
                     <LogOut className="h-5 w-5" />
                   </button>
                 </div>

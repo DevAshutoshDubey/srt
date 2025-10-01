@@ -1,27 +1,21 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { queries } from '@/lib/db';
+import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { queries } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session) {
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     // Get user details from database
     const user = await queries.getUserByEmail(session.user.email);
-    
+
     if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     // Get organization details
@@ -36,7 +30,8 @@ export async function GET(request: NextRequest) {
           firstName: user.first_name,
           lastName: user.last_name,
           role: user.role,
-          createdAt: user.created_at
+          adminLevel: user.admin_level,
+          createdAt: user.created_at,
         },
         organization: {
           id: organization.id,
@@ -47,57 +42,43 @@ export async function GET(request: NextRequest) {
           monthlyUrlsUsed: organization.monthly_urls_used,
           monthlyUrlLimit: organization.monthly_url_limit,
           apiKey: organization.api_key,
-          createdAt: organization.created_at
-        }
-      }
+          createdAt: organization.created_at,
+        },
+      },
     });
-
   } catch (error) {
-    console.error('Profile fetch error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error("Profile fetch error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
 export async function PUT(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session) {
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     const { firstName, lastName } = await request.json();
 
     if (!firstName || !lastName) {
-      return NextResponse.json(
-        { error: 'First name and last name are required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "First name and last name are required" }, { status: 400 });
     }
 
     // Update user profile
     const updatedUser = await queries.updateUserProfile(session.user.email, {
       firstName,
-      lastName
+      lastName,
     });
 
     return NextResponse.json({
       success: true,
       data: updatedUser,
-      message: 'Profile updated successfully'
+      message: "Profile updated successfully",
     });
-
   } catch (error) {
-    console.error('Profile update error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error("Profile update error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -32,6 +32,7 @@ interface UserProfile {
     email: string;
     firstName: string;
     lastName: string;
+    adminLevel:string;
     role: string;
   };
   organization: {
@@ -142,7 +143,8 @@ export default function DashboardPage() {
     email: profile.user.email,
     organizationName: profile.organization.name,
     organizationId: profile.organization.id,
-    apiKey: profile.organization.apiKey
+    apiKey: profile.organization.apiKey,
+    adminLevel: profile.user.adminLevel
   };
 
   if (loading) {

@@ -294,4 +294,153 @@ export const queries = {
     `;
     return result;
   },
+   // Admin Methods
+  getAllUsers: async (limit = 50, offset = 0, search = '') => {
+    let query = sql`
+      SELECT 
+        u.id,
+        u.email,
+        u.first_name,
+        u.last_name,
+        u.role,
+        u.admin_level,
+        u.created_at,
+        o.name as organization_name,
+        o.subscription_tier,
+        o.subscription_status,
+        o.monthly_urls_used,
+        o.monthly_url_limit,
+        (SELECT COUNT(*) FROM urls WHERE organization_id = o.id) as total_urls,
+        (SELECT COALESCE(SUM(click_count), 0) FROM urls WHERE organization_id = o.id) as total_clicks
+      FROM users u
+      JOIN organizations o ON u.organization_id = o.id
+    `;
+
+    if (search) {
+      query = sql`
+        ${query}
+        WHERE u.email ILIKE ${'%' + search + '%'} 
+        OR u.first_name ILIKE ${'%' + search + '%'}
+        OR u.last_name ILIKE ${'%' + search + '%'}
+        OR o.name ILIKE ${'%' + search + '%'}
+      `;
+    }
+
+    query = sql`
+      ${query}
+      ORDER BY u.created_at DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+
+    return await query;
+  },
+
+  getUsersCount: async (search = '') => {
+    let query = sql`
+      SELECT COUNT(*) as count
+      FROM users u
+      JOIN organizations o ON u.organization_id = o.id
+    `;
+
+    if (search) {
+      query = sql`
+        ${query}
+        WHERE u.email ILIKE ${'%' + search + '%'} 
+        OR u.first_name ILIKE ${'%' + search + '%'}
+        OR u.last_name ILIKE ${'%' + search + '%'}
+        OR o.name ILIKE ${'%' + search + '%'}
+      `;
+    }
+
+    const result = await query;
+    return parseInt(result[0].count);
+  },
+
+  updateUserAdminLevel: async (userId: number, adminLevel: string) => {
+    const result = await sql`
+      UPDATE users 
+      SET admin_level = ${adminLevel}, updated_at = NOW()
+      WHERE id = ${userId}
+      RETURNING *
+    `;
+    return result[0];
+  },
+
+  suspendUser: async (userId: number) => {
+    await sql`
+      UPDATE users 
+      SET admin_level = 'suspended', updated_at = NOW()
+      WHERE id = ${userId}
+    `;
+    
+    // Also suspend the organization
+    await sql`
+      UPDATE organizations 
+      SET subscription_status = 'suspended', updated_at = NOW()
+      WHERE id = (SELECT organization_id FROM users WHERE id = ${userId})
+    `;
+  },
+
+  getSystemStats: async () => {
+    const result = await sql`
+      SELECT 
+        (SELECT COUNT(*) FROM users) as total_users,
+        (SELECT COUNT(*) FROM organizations) as total_organizations,
+        (SELECT COUNT(*) FROM urls) as total_urls,
+        (SELECT COALESCE(SUM(click_count), 0) FROM urls) as total_clicks,
+        (SELECT COUNT(*) FROM domains WHERE is_active = true) as active_domains,
+        (SELECT COUNT(*) FROM users WHERE created_at >= CURRENT_DATE - INTERVAL '30 days') as new_users_this_month,
+        (SELECT COUNT(*) FROM urls WHERE created_at >= CURRENT_DATE - INTERVAL '24 hours') as urls_created_today
+    `;
+    return result[0];
+  },
+
+  getAdminSettings: async () => {
+    const result = await sql`
+      SELECT setting_key, setting_value, description 
+      FROM admin_settings 
+      ORDER BY setting_key
+    `;
+    return result;
+  },
+
+  updateAdminSetting: async (key: string, value: string) => {
+    const result = await sql`
+      UPDATE admin_settings 
+      SET setting_value = ${value}, updated_at = NOW()
+      WHERE setting_key = ${key}
+      RETURNING *
+    `;
+    return result[0];
+  },
+
+  logAdminAction: async (data: {
+    adminUserId: number;
+    action: string;
+    targetType?: string;
+    targetId?: number;
+    details?: any;
+    ipAddress?: string;
+  }) => {
+    const result = await sql`
+      INSERT INTO admin_logs (admin_user_id, action, target_type, target_id, details, ip_address)
+      VALUES (${data.adminUserId}, ${data.action}, ${data.targetType || null}, ${data.targetId || null}, ${JSON.stringify(data.details) || null}, ${data.ipAddress || null})
+      RETURNING *
+    `;
+    return result[0];
+  },
+
+  getAdminLogs: async (limit = 100, offset = 0) => {
+    const result = await sql`
+      SELECT 
+        al.*,
+        u.email as admin_email,
+        u.first_name || ' ' || u.last_name as admin_name
+      FROM admin_logs al
+      JOIN users u ON al.admin_user_id = u.id
+      ORDER BY al.created_at DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+    return result;
+  },
 };
