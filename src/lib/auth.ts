@@ -1,7 +1,9 @@
+// lib/auth.ts
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { queries } from './db';
+import sql from './db';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -32,6 +34,13 @@ export const authOptions: NextAuthOptions = {
             return null;
           }
 
+          // Update last login timestamp
+          await sql`
+            UPDATE users 
+            SET last_login = NOW() 
+            WHERE id = ${user.id}
+          `;
+
           return {
             id: user.id.toString(),
             email: user.email,
@@ -40,7 +49,8 @@ export const authOptions: NextAuthOptions = {
             organizationSlug: user.organization_slug,
             organizationName: user.organization_name,
             apiKey: user.api_key,
-            role: user.role
+            role: user.role,
+            adminLevel: user.admin_level || 'user' // ADD THIS
           };
         } catch (error) {
           console.error('Auth error:', error);
@@ -60,6 +70,7 @@ export const authOptions: NextAuthOptions = {
         token.organizationName = user.organizationName;
         token.apiKey = user.apiKey;
         token.role = user.role;
+        token.adminLevel = user.adminLevel ?? ''; // ADD THIS
       }
       return token;
     },
@@ -70,6 +81,7 @@ export const authOptions: NextAuthOptions = {
         session.user.organizationName = token.organizationName as string;
         session.user.apiKey = token.apiKey as string;
         session.user.role = token.role as string;
+        session.user.adminLevel = token.adminLevel as string; // ADD THIS
       }
       return session;
     }

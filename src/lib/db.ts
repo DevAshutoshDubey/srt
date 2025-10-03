@@ -58,15 +58,27 @@ export const queries = {
     return result[0];
   },
 
-  getUserByEmail: async (email: string) => {
+  async getUserByEmail(email: string) {
     const result = await sql`
-      SELECT u.*, o.name as organization_name, o.slug as organization_slug
+      SELECT 
+        u.id,
+        u.email,
+        u.password_hash,
+        u.first_name,
+        u.last_name,
+        u.role,
+        u.admin_level,  -- ADD THIS
+        u.organization_id,
+        o.slug as organization_slug,
+        o.name as organization_name,
+        o.api_key
       FROM users u
-      JOIN organizations o ON u.organization_id = o.id
+      LEFT JOIN organizations o ON u.organization_id = o.id
       WHERE u.email = ${email}
       LIMIT 1
     `;
-    return result[0] || null;
+
+    return result.length > 0 ? result[0] : null;
   },
 
   // URLs
@@ -80,7 +92,9 @@ export const queries = {
   }) => {
     const result = await sql`
       INSERT INTO urls (organization_id, original_url, short_code, domain_id, created_by, expires_at)
-      VALUES (${data.organizationId}, ${data.originalUrl}, ${data.shortCode}, ${data.domainId || null}, ${data.createdBy || null}, ${data.expiresAt || null})
+      VALUES (${data.organizationId}, ${data.originalUrl}, ${data.shortCode}, ${
+      data.domainId || null
+    }, ${data.createdBy || null}, ${data.expiresAt || null})
       RETURNING *
     `;
     return result[0];
@@ -235,10 +249,13 @@ export const queries = {
     return result[0];
   },
 
-   updateUserProfile: async (email: string, data: {
-    firstName: string;
-    lastName: string;
-  }) => {
+  updateUserProfile: async (
+    email: string,
+    data: {
+      firstName: string;
+      lastName: string;
+    }
+  ) => {
     const result = await sql`
       UPDATE users 
       SET 
@@ -277,13 +294,13 @@ export const queries = {
     return result[0] || null;
   },
 
-   getOrganizationById: async (id: number) => {
+  getOrganizationById: async (id: number) => {
     const result = await sql`
       SELECT * FROM organizations WHERE id = ${id} LIMIT 1
     `;
     return result[0] || null;
   },
-   getUrlsByOrganization: async (organizationId: number, limit = 10) => {
+  getUrlsByOrganization: async (organizationId: number, limit = 10) => {
     const result = await sql`
       SELECT u.*, d.domain
       FROM urls u
@@ -294,8 +311,8 @@ export const queries = {
     `;
     return result;
   },
-   // Admin Methods
-  getAllUsers: async (limit = 50, offset = 0, search = '') => {
+  // Admin Methods
+  getAllUsers: async (limit = 50, offset = 0, search = "") => {
     let query = sql`
       SELECT 
         u.id,
@@ -319,10 +336,10 @@ export const queries = {
     if (search) {
       query = sql`
         ${query}
-        WHERE u.email ILIKE ${'%' + search + '%'} 
-        OR u.first_name ILIKE ${'%' + search + '%'}
-        OR u.last_name ILIKE ${'%' + search + '%'}
-        OR o.name ILIKE ${'%' + search + '%'}
+        WHERE u.email ILIKE ${"%" + search + "%"} 
+        OR u.first_name ILIKE ${"%" + search + "%"}
+        OR u.last_name ILIKE ${"%" + search + "%"}
+        OR o.name ILIKE ${"%" + search + "%"}
       `;
     }
 
@@ -335,7 +352,7 @@ export const queries = {
     return await query;
   },
 
-  getUsersCount: async (search = '') => {
+  getUsersCount: async (search = "") => {
     let query = sql`
       SELECT COUNT(*) as count
       FROM users u
@@ -345,10 +362,10 @@ export const queries = {
     if (search) {
       query = sql`
         ${query}
-        WHERE u.email ILIKE ${'%' + search + '%'} 
-        OR u.first_name ILIKE ${'%' + search + '%'}
-        OR u.last_name ILIKE ${'%' + search + '%'}
-        OR o.name ILIKE ${'%' + search + '%'}
+        WHERE u.email ILIKE ${"%" + search + "%"} 
+        OR u.first_name ILIKE ${"%" + search + "%"}
+        OR u.last_name ILIKE ${"%" + search + "%"}
+        OR o.name ILIKE ${"%" + search + "%"}
       `;
     }
 
@@ -372,7 +389,7 @@ export const queries = {
       SET admin_level = 'suspended', updated_at = NOW()
       WHERE id = ${userId}
     `;
-    
+
     // Also suspend the organization
     await sql`
       UPDATE organizations 
@@ -424,7 +441,9 @@ export const queries = {
   }) => {
     const result = await sql`
       INSERT INTO admin_logs (admin_user_id, action, target_type, target_id, details, ip_address)
-      VALUES (${data.adminUserId}, ${data.action}, ${data.targetType || null}, ${data.targetId || null}, ${JSON.stringify(data.details) || null}, ${data.ipAddress || null})
+      VALUES (${data.adminUserId}, ${data.action}, ${data.targetType || null}, ${
+      data.targetId || null
+    }, ${JSON.stringify(data.details) || null}, ${data.ipAddress || null})
       RETURNING *
     `;
     return result[0];

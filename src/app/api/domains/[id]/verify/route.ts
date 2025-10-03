@@ -1,6 +1,7 @@
+// api/domains/[id]/verify/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { queries } from '@/lib/db';
 import sql from '@/lib/db';
+import { verifyDomainDNS } from '@/lib/domain-verification';
 
 export async function POST(
   request: NextRequest,
@@ -41,22 +42,42 @@ export async function POST(
 
     const domain = domainResult[0];
 
-    // Simulate DNS verification (in production, you'd actually check DNS records)
-    const verified = await verifyDomainDNS(domain.domain);
+    // Update verification attempts
+    await sql`
+      UPDATE domains 
+      SET verification_attempts = verification_attempts + 1,
+          last_verification_attempt = NOW()
+      WHERE id = ${domainId}
+    `;
 
-    if (verified) {
-      const verifiedDomain = await queries.verifyDomain(domainId, parseInt(organizationId));
+    // Perform actual DNS verification
+    const verificationResult = await verifyDomainDNS(domain.domain);
+
+    if (verificationResult.isVerified) {
+      // Update domain as verified
+      const verifiedDomain = await sql`
+        UPDATE domains 
+        SET verified_at = NOW(), 
+            is_active = true,
+            verification_method = ${verificationResult.method}
+        WHERE id = ${domainId}
+        RETURNING *
+      `;
       
       return NextResponse.json({
         success: true,
-        message: 'Domain verified successfully',
-        data: verifiedDomain
+        message: `Domain verified successfully via ${verificationResult.method}`,
+        data: {
+          domain: verifiedDomain[0],
+          verification: verificationResult
+        }
       });
     } else {
       return NextResponse.json({
         success: false,
         error: 'Domain verification failed',
-        message: 'Please ensure your DNS records are properly configured and try again.'
+        message: verificationResult.details.error || 'DNS configuration not found',
+        details: verificationResult.details
       }, { status: 400 });
     }
 
@@ -66,28 +87,5 @@ export async function POST(
       { error: 'Internal server error' },
       { status: 500 }
     );
-  }
-}
-
-// Simulate DNS verification - in production, use actual DNS lookup
-async function verifyDomainDNS(domain: string): Promise<boolean> {
-  try {
-    // For demo purposes, we'll simulate verification
-    // In production, you would:
-    // 1. Check DNS A record points to your server IP
-    // 2. Check DNS CNAME points to your service
-    // 3. Verify HTTP/HTTPS access works
-    
-    console.log(`Verifying domain: ${domain}`);
-    
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // For demo, randomly succeed/fail (or always succeed for testing)
-    return true; // Change to Math.random() > 0.3 for random results
-    
-  } catch (error) {
-    console.error('DNS verification failed:', error);
-    return false;
   }
 }

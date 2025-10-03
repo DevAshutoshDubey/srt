@@ -1,5 +1,6 @@
+import { requireSuperAdmin } from '@/lib/adminAuth';
 import { NextRequest, NextResponse } from 'next/server';
-import { requireSuperAdmin } from '@/middleware/adminAuth';
+
 
 export async function GET(request: NextRequest) {
   const authResult = await requireSuperAdmin(request);
